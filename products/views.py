@@ -6,6 +6,7 @@ from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from products.mongo_logger import log_search
+from thefuzz import process, fuzz
 
 from .models import Product
 from .serializers import ProductSerializer
@@ -111,7 +112,8 @@ class ProductSearchView(APIView):
         description=(
             "Full-text product search with 3-tier relevance ranking. "
             "Tier 1: category match (0.7–1.0), Tier 2: tag match (0.4–0.69), "
-            "Tier 3: name/description match (0.1–0.39)."
+            "Tier 3: name/description match (0.1–0.39). "
+            "Falls back to fuzzy matching (thefuzz) when exact search returns 0 results."
         ),
         parameters=[
             OpenApiParameter("q", str, OpenApiParameter.QUERY, required=True, description="Search query"),
@@ -148,10 +150,47 @@ class ProductSearchView(APIView):
 
         ranked = _rank_products(qs, query)
 
+        # --- Fuzzy fallback when exact search returns 0 results ---
+        search_type = "exact"
+        if len(ranked) == 0:
+            search_type = "fuzzy"
+            all_products = list(Product.objects.all())
+
+            choices = [(p.product_name, p) for p in all_products] + [(p.category, p) for p in all_products]
+            choice_strings = [c[0] for c in choices]
+            string_to_products = {}
+            for text, product in choices:
+                string_to_products.setdefault(text, []).append(product)
+
+            fuzzy_matches = process.extractBests(
+                query,
+                choice_strings,
+                scorer=fuzz.WRatio,
+                score_cutoff=70,
+                limit=20,
+            )
+
+            seen_ids = set()
+            for match_str, fuzz_score in fuzzy_matches:
+                for product in string_to_products.get(match_str, []):
+                    if product.id in seen_ids:
+                        continue
+                    seen_ids.add(product.id)
+                    relevance_score = round((fuzz_score - 70) / 100 * 0.29 + 0.1, 4)
+                    ranked.append({
+                        "product": product,
+                        "relevance_score": relevance_score,
+                        "rank_reason": f"Fuzzy match (score: {fuzz_score})",
+                        "_tier": 99,
+                        "_sub": fuzz_score,
+                    })
+
+            ranked.sort(key=lambda x: -x["relevance_score"])
+
         total_results = len(ranked)
 
         if total_results == 0:
-            return Response({"query": query, "total_results": 0, "results": []})
+            return Response({"query": query, "search_type": search_type, "total_results": 0, "results": []})
 
         page_obj, paginator = _paginate(ranked, request, default_page_size=20)
 
@@ -161,13 +200,13 @@ class ProductSearchView(APIView):
             product.relevance_score = item["relevance_score"]
             product.rank_reason = item["rank_reason"]
             results.append(ProductSerializer(product).data)
-        
+
         result_ids = [item["product"].id for item in ranked]
         log_search(request.user.id, request.user.username, query, total_results, result_ids)
 
-        
         return Response({
             "query": query,
+            "search_type": search_type,
             "total_results": total_results,
             "page": page_obj.number,
             "total_pages": paginator.num_pages,
