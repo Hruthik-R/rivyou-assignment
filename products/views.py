@@ -5,6 +5,7 @@ from rest_framework import status
 from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from products.mongo_logger import log_search
 
 from .models import Product
 from .serializers import ProductSerializer
@@ -160,7 +161,11 @@ class ProductSearchView(APIView):
             product.relevance_score = item["relevance_score"]
             product.rank_reason = item["rank_reason"]
             results.append(ProductSerializer(product).data)
+        
+        result_ids = [item["product"].id for item in ranked]
+        log_search(request.user.id, request.user.username, query, total_results, result_ids)
 
+        
         return Response({
             "query": query,
             "total_results": total_results,

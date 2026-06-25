@@ -203,3 +203,4 @@ RQ_QUEUES = {
         "DEFAULT_TIMEOUT": 360,
     },
 }
+MONGO_URI = config("MONGO_URI")
