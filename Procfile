@@ -1,0 +1,1 @@
+web: gunicorn rivyou.wsgi --log-file -
