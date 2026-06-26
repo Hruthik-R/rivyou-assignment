@@ -23,6 +23,7 @@ urlpatterns = [
 
     # Auth endpoints
     path("api/auth/", include("users.urls")),
+    path("api/analytics/", include("users.urls")),
 
     # Products API
     path("api/products/", include("products.urls")),
