@@ -66,8 +66,8 @@ A Django REST API built as a Backend Engineer Intern assignment, implementing a 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/rivyou.git
-cd rivyou
+git clone https://github.com/Hruthik-R/rivyou-assignment.git
+cd rivyou-assignment
 ```
 
 ### 2. Create and Activate a Virtual Environment
@@ -246,7 +246,8 @@ The test suite covers:
 ## Notes
 
 **Deployment**
-The project is not deployed. Per the assignment requirements, it uses a local PostgreSQL instance, making a hosted deployment outside scope. That said, it can be deployed to Railway or Render with a single `DATABASE_URL` config change — the codebase is already structured for it.
+Live demo: https://web-production-fa33a.up.railway.app/api/docs/
+Deployed on Railway with cloud PostgreSQL. Full local setup instructions above.
 
 **Redis / Caching**
 `django-rq` is listed in `requirements.txt` and the project architecture is designed to support Redis-backed caching and background task queuing. It was intentionally left inactive in this submission to keep the codebase clean and focused on the core assignment requirements — adding it would be straightforward.
